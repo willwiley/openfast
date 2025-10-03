@@ -517,6 +517,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: F_BF_End      !<  [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: V_rel_n      !< Normal relative flow velocity at joints [m/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: V_rel_n_HiPass      !< High-pass filtered normal relative flow velocity at joints [m/s]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: AKC      !< Amplitude for instantaneous KC number calculation [m]    
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: zFillGroup      !< Instantaneous highest point of each filled group [m]
     TYPE(MeshMapType)  :: VisMeshMap      !< Mesh mapping for visualization mesh [-]
     TYPE(SeaSt_WaveField_MiscVarType)  :: WaveField_m      !< misc var information from the SeaState Interpolation module [-]
@@ -4620,6 +4621,18 @@ subroutine Morison_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%V_rel_n_HiPass = SrcMiscData%V_rel_n_HiPass
    end if
+   if (allocated(SrcMiscData%AKC)) then
+      LB(1:1) = lbound(SrcMiscData%AKC)
+      UB(1:1) = ubound(SrcMiscData%AKC)
+      if (.not. allocated(DstMiscData%AKC)) then
+         allocate(DstMiscData%AKC(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%AKC.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%AKC = SrcMiscData%AKC
+   end if
    if (allocated(SrcMiscData%zFillGroup)) then
       LB(1:1) = lbound(SrcMiscData%zFillGroup)
       UB(1:1) = ubound(SrcMiscData%zFillGroup)
@@ -4717,6 +4730,9 @@ subroutine Morison_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%V_rel_n_HiPass)) then
       deallocate(MiscData%V_rel_n_HiPass)
    end if
+   if (allocated(MiscData%AKC)) then
+      deallocate(MiscData%AKC)
+   end if
    if (allocated(MiscData%zFillGroup)) then
       deallocate(MiscData%zFillGroup)
    end if
@@ -4761,6 +4777,7 @@ subroutine Morison_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%F_BF_End)
    call RegPackAlloc(RF, InData%V_rel_n)
    call RegPackAlloc(RF, InData%V_rel_n_HiPass)
+   call RegPackAlloc(RF, InData%AKC)
    call RegPackAlloc(RF, InData%zFillGroup)
    call NWTC_Library_PackMeshMapType(RF, InData%VisMeshMap) 
    call SeaSt_WaveField_PackMisc(RF, InData%WaveField_m) 
@@ -4808,6 +4825,7 @@ subroutine Morison_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%F_BF_End); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%V_rel_n); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%V_rel_n_HiPass); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%AKC); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%zFillGroup); if (RegCheckErr(RF, RoutineName)) return
    call NWTC_Library_UnpackMeshMapType(RF, OutData%VisMeshMap) ! VisMeshMap 
    call SeaSt_WaveField_UnpackMisc(RF, OutData%WaveField_m) ! WaveField_m 

@@ -2764,6 +2764,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       InitInp%Nodes(i)%JAxFDMod   = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxFDMod
       InitInp%Nodes(i)%JAxVnCOff  = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxVnCOff
       InitInp%Nodes(i)%JAxFDLoFSc = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxFDLoFSc
+      InitInp%Nodes(i)%JAXKC      = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxKC
   
       ! Redundant work (these are already assigned to the member data arrays, 
       ! but is needed on the joint data because we report the tMG, and MGDensity at each Joint node in the Summary File
@@ -3314,6 +3315,7 @@ SUBROUTINE AllocateNodeLoadVariables(InitInp, p, m, NNodes, errStat, errMsg )
    call AllocAry( p%DP_Const_End ,    3, p%NJoints, 'p%DP_Const_End'  , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%V_rel_n        ,     p%NJoints, 'm%V_rel_n'       , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%V_rel_n_HiPass ,     p%NJoints, 'm%V_rel_n_HiPass', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
+   call AllocAry( m%AKC            ,     p%NJoints, 'm%AKC'           , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%zFillGroup   ,   p%NFillGroups, 'm%zFillGroup'    , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragMod_End    ,     p%NJoints, 'p%DragMod_End'   , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragLoFSc_End  ,     p%NJoints, 'p%DragLoFSc_End' , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
@@ -3343,6 +3345,7 @@ SUBROUTINE AllocateNodeLoadVariables(InitInp, p, m, NNodes, errStat, errMsg )
    p%AM_End         = 0.0
    m%V_rel_n        = 0.0_ReKi
    m%V_rel_n_HiPass = 0.0_ReKi
+   m%AKC            = 0.0_ReKi
    
 END SUBROUTINE AllocateNodeLoadVariables
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -4606,6 +4609,19 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
       vmag  = m%nodeInWater(j) * ( m%vrel(1,j)*An_End(1) + m%vrel(2,j)*An_End(2) + m%vrel(3,j)*An_End(3) )
       ! High-pass filtering
       vmagf = p%VRelNFiltConst(J) * (vmag + xd%v_rel_n_FiltStat(J))
+
+      ! Amplitude for instantaneous KC number
+      IF ( p%DragMod_End(J) == 2_IntKi ) THEN
+         IF (m%nodeInWater(j) == 0) THEN
+            m%AKC(j) = 0
+         ELSE
+            IF (vmag * (vmag +  dot_product(An_End(1:3),(m%FA(:,j)-qdotdot(1:3))*p%DT)) < 0) THEN
+               m%AKC(j) = 0
+            END IF
+            m%AKC(j) = m%AKC(j) + vmag*p%DT
+         END IF
+         DragConst_KC = InterpWrappedStpLogical( m%AKC(j)*2*Pi/m%, listKC, listCd, Ind, AryLen )
+      END IF
 
       ! Record most up-to-date vmagf and vmag at join J
       m%v_rel_n(j) = vmag
