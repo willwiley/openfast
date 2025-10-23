@@ -2764,7 +2764,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       InitInp%Nodes(i)%JAxFDMod   = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxFDMod
       InitInp%Nodes(i)%JAxVnCOff  = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxVnCOff
       InitInp%Nodes(i)%JAxFDLoFSc = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxFDLoFSc
-      InitInp%Nodes(i)%JAXKC      = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxKC
+      InitInp%Nodes(i)%JAxiKC      = InitInp%AxialCoefs(InitInp%InpJoints(i)%JointAxIDIndx)%AxiKC
   
       ! Redundant work (these are already assigned to the member data arrays, 
       ! but is needed on the joint data because we report the tMG, and MGDensity at each Joint node in the Summary File
@@ -2874,6 +2874,22 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       RETURN
    END IF
    xd%V_rel_n_FiltStat = 0.0_ReKi
+
+   ALLOCATE ( xd%AKC(p%NJoints), STAT = ErrStat )
+   IF ( ErrStat /= ErrID_None ) THEN
+      ErrMsg  = ' Error allocating space for AKC array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF
+   xd%AKC = 0.0_ReKi
+   
+   ALLOCATE ( xd%vmag_previous(p%NJoints), STAT = ErrStat )
+   IF ( ErrStat /= ErrID_None ) THEN
+      ErrMsg  = ' Error allocating space for vmag_previous array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF
+   xd%vmag_previous = 0.0_ReKi
 
    z%DummyConstrState         = 0
    OtherState%DummyOtherState = 0
@@ -3027,6 +3043,8 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
          p%DragLoFSc_End (i) = InitInp%Nodes(i)%JAxFDLoFSc
       END IF
 
+      p%AxiKC(i) = InitInp%Nodes(i)%JAxiKC
+
    END DO ! looping through nodes that are joints, i
           
    ! Copy ballast group information to parameters
@@ -3057,6 +3075,10 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
          END IF
       END DO
    END DO
+
+   ! KC-Cd table
+   p%KCCd = InitInp%KCCd
+   p%iKCstart = InitInp%iKCstart 
 
          ! Define initial guess for the system inputs here:
          !    u%DummyInput = 0
@@ -3411,6 +3433,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
    REAL(ReKi)               :: h, h_c_AM, deltal_AM
    REAL(ReKi)               :: F_WMG(6), F_IMG(6), F_If(6), F_B0(6), F_B1(6), F_B2(6), F_B_End(6)
    REAL(ReKi)               :: AM_End(3,3), An_End(3), DP_Const_End(3), I_MG_End(3,3)
+   REAL(ReKi)               :: Cd_End_KC
 
    ! Local variables needed for wave stretching and load smoothing/redistribution
    INTEGER(IntKi)           :: FSElem
@@ -4610,17 +4633,9 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
       ! High-pass filtering
       vmagf = p%VRelNFiltConst(J) * (vmag + xd%v_rel_n_FiltStat(J))
 
-      ! Amplitude for instantaneous KC number
-      IF ( p%DragMod_End(J) == 2_IntKi ) THEN
-         IF (m%nodeInWater(j) == 0) THEN
-            m%AKC(j) = 0
-         ELSE
-            IF (vmag * (vmag +  dot_product(An_End(1:3),(m%FA(:,j)-qdotdot(1:3))*p%DT)) < 0) THEN
-               m%AKC(j) = 0
-            END IF
-            m%AKC(j) = m%AKC(j) + vmag*p%DT
-         END IF
-         DragConst_KC = InterpWrappedStpLogical( m%AKC(j)*2*Pi/m%, listKC, listCd, Ind, AryLen )
+      ! Drag coefficient if instantaneous KC dependent drag is enabled
+      IF ( p%AxiKC(J) > 0_IntKi ) THEN
+         Cd_End_KC = InterpBinComp( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),1), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),2), 1, (p%iKCstart(p%AxiKC(J),2)-p%iKCstart(p%AxiKC(J),1)+1) )
       END IF
 
       ! Record most up-to-date vmagf and vmag at join J
@@ -4632,13 +4647,21 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
          IF (I < 4 ) THEN ! Three force components
             IF ( p%DragMod_End(J) .EQ. 0_IntKi ) THEN
                ! Note: vmag is zero if node is not in the water
-               m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*vmagf &   
-                                          + p%DragLoFSc_End(j)  * An_End(i) * p%DragConst_End(j) * abs(vmag )*vmag  
+               IF ( p%AxiKC(J) > 0_IntKi ) THEN
+                  m%F_D_End(i,j) = 0.25_ReKi * p%WaveField%WtrDens * Cd_End_KC * An_End(i) * abs(vmag)*vmag / dot_product(An_End,An_End)
+               ELSE
+                  m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*vmagf &   
+                                             + p%DragLoFSc_End(j)  * An_End(i) * p%DragConst_End(j) * abs(vmag )*vmag  
+               END IF
             ELSE IF (p%DragMod_End(J) .EQ. 1_IntKi) THEN
                ! Note: vmag is zero if node is not in the water
-               m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*max(vmagf,0.0_ReKi) &
-                                          + p%DragLoFSc_End(j)  * An_End(i) * p%DragConst_End(j) * abs(vmag) *max(vmag, 0.0_ReKi)
-               m%F_D_End(i,j) = 2.0_ReKi * m%F_D_End(i,j)
+               IF ( p%AxiKC(J) > 0_IntKi ) THEN
+                  m%F_D_End(i,j) = 0.5_ReKi * p%WaveField%WtrDens * Cd_End_KC * An_End(i) * abs(vmag)*vmag / dot_product(An_End,An_End) 
+               ELSE
+                  m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*max(vmagf,0.0_ReKi) &
+                                             + p%DragLoFSc_End(j)  * An_End(i) * p%DragConst_End(j) * abs(vmag) *max(vmag, 0.0_ReKi)
+                  m%F_D_End(i,j) = 2.0_ReKi * m%F_D_End(i,j)
+               END IF
             END IF
             
             y%Mesh%Force(i,j)    = y%Mesh%Force(i,j)    + m%F_D_End(i,j) + m%F_I_End(i,j) + p%F_WMG_End(i,j) + m%F_B_End(i,j) + m%F_BF_End(i,j) + m%F_A_End(i,j) + m%F_IMG_End(i,j)
@@ -6050,6 +6073,20 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
       vmagf = p%VRelNFiltConst(J) * (vmag + xd%V_rel_n_FiltStat(J))
       ! Update relative normal velocity filter state for joint J 
       xd%V_rel_n_FiltStat(J) = vmagf-vmag
+
+      ! Update amplitude for instantaneous KC number
+      IF ( p%AxiKC(J) > 0 ) THEN 
+         IF (m%nodeInWater(j) == 0) THEN
+            xd%AKC(J) = 0
+         ELSE
+            IF (vmag * xd%vmag_previous(J) < 0) THEN
+               xd%AKC(J) = 0
+            END IF
+            xd%AKC(J) = xd%AKC(J) + vmag*p%DT
+         END IF
+      END IF
+
+      xd%vmag_previous(J) = vmag
 
    END DO ! J = 1, p%NJoints
 

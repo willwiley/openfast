@@ -81,11 +81,18 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
    INTEGER                                      :: UnEc                 ! The local unit number for this module's echo file
    CHARACTER(1024)                              :: EchoFile             ! Name of HydroDyn echo file
    CHARACTER(MaxFileInfoLineLen)                :: Line                 ! String to temporarially hold value of read line
+   CHARACTER(8)                                 :: KCFile               ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(1024)                              :: KCPath               ! String to temporarilly hold path name of KC-Cd function file                               
    real(ReKi), ALLOCATABLE                      :: tmpVec1(:), tmpVec2(:) ! Temporary arrays for WAMIT data
    integer(IntKi)                               :: startIndx, endIndx   ! indices into working arrays
    INTEGER, ALLOCATABLE                         :: tmpArray(:)          ! Temporary array storage of the joint output list
    REAL(ReKi), ALLOCATABLE                      :: tmpReArray(:)        ! Temporary array storage of the joint output list
    INTEGER(IntKi)                               :: CurLine              !< Current entry in FileInfo_In%Lines array
+   INTEGER(IntKi)                               :: NKCCd                ! Temporary number of provided KC-Cd functions
+   INTEGER(IntKi)                               :: NKC                  ! Temporary number of lines in a KC-Cd function file
+   INTEGER(IntKi)                               :: totalNKC             ! Temporary counter for the total number of lines in concatenated KC table
+   REAL(ReKi), DIMENSION(2)                     :: tmpKCCd              ! Temporary array for reading row of KC-Cd function files
+   
    INTEGER(IntKi)                               :: ErrStat2
    CHARACTER(ErrMsgLen)                         :: ErrMsg2
    CHARACTER(*),  PARAMETER                     :: RoutineName = 'HydroDyn_ParaseInput'
@@ -382,26 +389,40 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
       END IF
           
       DO I = 1,InputFileData%Morison%NAxCoefs
-         ! read the table entries AxCoefID, AxCd, AxCa, AxCp, AxFdMod, AxVnCOff, AxFDLoFSc in the HydroDyn input file
-         ! Try reading in 7 entries first
-         call ParseAry( FileInfo_In, CurLine, ' axial coefficients line '//trim( Int2LStr(I)), tmpReArray, size(tmpReArray), ErrStat2, ErrMsg2, UnEc )
-         if ( ErrStat2 /= ErrID_None ) then ! Try reading in 5 entries
-            tmpReArray(6) = -1.0  ! AxVnCoff
-            tmpReArray(7) =  1.0  ! AxFDLoFSc
-            call ParseAry( FileInfo_In, CurLine, ' axial coefficients line '//trim( Int2LStr(I)), tmpReArray(1:5), 5, ErrStat2, ErrMsg2, UnEc )
-            if ( ErrStat2 /= ErrID_None ) then ! Try reading in 4 entries
-               tmpReArray(5) =  0.0  ! AxFdMod
-               call ParseAry( FileInfo_In, CurLine, ' axial coefficients line '//trim( Int2LStr(I)), tmpReArray(1:4), 4, ErrStat2, ErrMsg2, UnEc )
+
+         ! Can't use ParseAry since cd could contain string for KC-Cd function
+         Line = FileInfo_In%Lines(CurLine+I-1)
+         READ(Line,*,ADVANCE='NO',IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+                                    InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp,  &
+                                    InputFileData%Morison%AxialCoefs(I)%AxFDMod, InputFileData%Morison%AxialCoefs(I)%AxVnCOff,     &
+                                    InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc
+         if (IS_IOSTAT_EOR(ErrStat2)) then
+            InputFileData%Morison%AxialCoefs(I)%AxVnCOff = -1.0
+            InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc = 1.0
+            READ(Line,*,ADVANCE='NO',IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+                                       InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp,  &
+                                       InputFileData%Morison%AxialCoefs(I)%AxFDMod
+            if (IS_IOSTAT_EOR(ErrStat2)) then
+               InputFileData%Morison%AxialCoefs(I)%AxFDMod  = 0.0
+               InputFileData%Morison%AxialCoefs(I)%AxVnCOff = -1.0
+               InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc = 1.0
+               READ(Line,*,ADVANCE='NO',IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+                              InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp
                if (Failed())  return;
             end if
          end if
-         InputFileData%Morison%AxialCoefs(I)%AxCoefID = NINT(tmpReArray(1))
-         InputFileData%Morison%AxialCoefs(I)%AxCd     =      tmpReArray(2)
-         InputFileData%Morison%AxialCoefs(I)%AxCa     =      tmpReArray(3)
-         InputFileData%Morison%AxialCoefs(I)%AxCp     =      tmpReArray(4)
-         InputFileData%Morison%AxialCoefs(I)%AxFDMod  = NINT(tmpReArray(5))
-         InputFileData%Morison%AxialCoefs(I)%AxVnCOff =      tmpReArray(6) 
-         InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc =     tmpReArray(7)
+         if ( KCFile(1:2) == "KC" ) then
+            InputFileData%Morison%AxialCoefs(I)%AxCd = 0.0
+            READ( KCFile(3:), '(I10)', iostat=ErrStat2 ) InputFileData%Morison%AxialCoefs(I)%AxiKC 
+         else
+            READ(KCFile,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCd
+            InputFileData%Morison%AxialCoefs(I)%AxiKC = 0
+            if (ErrStat2 /= 0) then 
+               ErrMsg2 = "AxCd input needs to either be a real number or a string starting with 'KC' followed by an integer between 1 and NKCCd"
+            end if
+            if (Failed())  return
+         end if
+
       END DO
 
       if (allocated(tmpReArray))      deallocate(tmpReArray)
@@ -1034,6 +1055,46 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
       if (allocated(tmpReArray))      deallocate(tmpReArray)
    END IF
 
+   !-------------------------------------------------------------------------------------------------
+   ! KC-Cd function paths
+   !-------------------------------------------------------------------------------------------------
+   call ParseVar( FileInfo_In, CurLine+1, 'NKCCd', NKCCd, ErrStat2, ErrMsg2, UnEc )
+   ALLOCATE(InputFileData%Morison%iKCstart(NKCCd,2))
+   totalNKC = 0_IntKi
+   IF ( ErrStat2 == 0 ) THEN
+      if ( InputFileData%Echo )   WRITE(UnEc, '(A)') trim(FileInfo_In%Lines(CurLine))    ! Write section break to echo
+      CurLine = CurLine + 1
+
+      ! First loop to check number of rows and allocate concatenated array
+      DO iKCCd = 1,NKCCd
+         CALL ParseVar( FileInfo_In, CurLine+iKCCd, 'KCPath', KCPath, ErrStat2, ErrMsg2, UnEc )
+         ! Assumed 1 header line -> NKC line -> column name line -> array
+         CALL ParseVar ( KCPath, 2, 'NKC', NKC, ErrStat2, ErrMsg2, UnEc )
+         InputFileData%Morison%iKCstart(iKCCd,1) = totalNKC + 1_IntKi
+         InputFileData%Morison%iKCstart(iKCCd,2) = totalNKC + NKC
+         totalNKC = totalNKC + NKC
+      END DO
+      ALLOCATE (KCCd(totalNKC,2))
+
+      ! Second loop to fill the concatenated array
+      DO iKCCd = 1,NKCCd
+         CALL ParseVar( FileInfo_In, CurLine+iKCCd, 'KCPath', KCPath, ErrStat2, ErrMsg2, UnEc )
+         ! Assumed 1 header line -> NKC line -> column name line -> array
+         CALL ParseVar ( KCPath, 2, 'NKC', NKC, ErrStat2, ErrMsg2, UnEc )
+         DO Row=1,NKC
+            CALL ParseAry ( KCPath, Row+3, 'tmpKCCd', tmpKCCd, 2, ErrStat2, ErrMsg2, UnEc )
+            InputFileData%Morison%KCCD(InputFileData%Morison%iKCstart(iKCCd,1)+Row-1,1) = tmpKCCd(1)
+            InputFileData%Morison%KCCD(InputFileData%Morison%iKCstart(iKCCd,1)+Row-1,2) = tmpKCCd(2)
+            ! Add check that all KC are ascending with error message if not
+            ! IF ( Row > 1 ) THEN 
+            !     IF ( tmpKCCd(1) <= InputFileData%Morison%KCCD(InputFileData%Morison%iKCstart(iKCCd,1)+Row-2,1) ) THEN
+            !        Error Message
+            !     END IF
+            !  END IF
+         END DO ! Row
+      END DO
+
+   END IF
 
    !-------------------------------------------------------------------------------------------------
    ! Member Output List Section

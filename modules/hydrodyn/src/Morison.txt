@@ -81,6 +81,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi             AxVnCOff                 -          -        -         "High-pass cut-off frequency for normal velocity when computing axial drag force" -
 typedef   ^                            ^                             ReKi             AxFDLoFSc                -          -        -         "Scaling factor for low frequency axial drag force" -
 typedef   ^                            ^                             IntKi            AxFDMod                  -          -        -         "Switch for the axial drag formulation {0: original formulation, 1: Away from member only}" -
+typedef   ^                            ^                             INTEGER          AxiKC                    -          -        -         "Integer of KC-Cd file to use if instantaneous KC dependent drag is enabled (0 if constant drag coefficient is used)"
 #
 typedef   ^                            Morison_MemberInputType       INTEGER          MemberID                 -          -        -         "User-supplied integer ID for this member"    -
 typedef   ^                            ^                             INTEGER          NodeIndx                 {:}        -        -         "Index of each of the member's nodes in the master node list"    -
@@ -116,6 +117,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi             JAxCp                    -          -        -         "Nodal lumped (joint) axial Ca"    -
 typedef   ^                            ^                             ReKi             JAxVnCOff                -          -        -         "High-pass cut-off frequency for normal velocity when computing axial drag force" -
 typedef   ^                            ^                             ReKi             JAxFDLoFSc               -          -        -         "Scaling factor for low frequency axial drag force" -
+typedef   ^                            ^                             INTEGER          JAxiKC                   -          -        -         "Integer of KC-Cd file to use if instantaneous KC dependent drag is enabled (0 if constant drag coefficient is used)"
 typedef   ^                            ^                             IntKi            JAxFDMod                 -          -        -         "Switch for the axial drag formulation {0: original formulation, 1: Away from member only}" -
 typedef   ^                            ^                             ReKi             FillDensity              -          -        -         "Fill fluid density"   kg/m^3
 typedef   ^                            ^                             ReKi             tMG                      -          -        -         "Nodal thickness with marine growth "    m
@@ -398,6 +400,8 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             SeaSt_WaveFieldType     *WaveField                        -          -        -         "Pointer to SeaState wave field" -
 typedef   ^                            ^                             logical                  VisMeshes                        -       .false.     -         "Output visualization meshes" -
 typedef   ^                            ^                             INTEGER                  PtfmYMod                         -          -        -         "Large yaw model" -
+typedef   ^                            ^                             ReKi                     KCCd                             {:}{:}     -        -         "Concatenated array of KC-Cd functions for KC-dependent drag"
+typedef   ^                            ^                             INTEGER                  iKCstart                         {:}{:}     -        -         "Start and stop indices for each KC-Cd function within the concatenated 'KCCd' array"        
 #
 #
 # Define outputs from the initialization routine here:
@@ -416,6 +420,8 @@ typedef   ^                            ContinuousStateType           SiKi       
 # Define discrete (nondifferentiable) states here:
 #
 typedef   ^                            DiscreteStateType             ReKi                     V_rel_n_FiltStat               {:}      -         -         "State of the high-pass filter for the joint relative normal velocity" m/s
+typedef   ^                            DiscreteStateType             ReKi                     AKC                            {:}      -         -         "State of the KC number amplitude for instantaneous KC dependent drag"
+typedef   ^                            DiscreteStateType             ReKi                     vmag_previous                  {:}      -         -         "Relative velocity magnitude from previous time step"
 #
 #
 # Define constraint states here:

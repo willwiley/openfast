@@ -125,6 +125,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: AxVnCOff = 0.0_ReKi      !< High-pass cut-off frequency for normal velocity when computing axial drag force [-]
     REAL(ReKi)  :: AxFDLoFSc = 0.0_ReKi      !< Scaling factor for low frequency axial drag force [-]
     INTEGER(IntKi)  :: AxFDMod = 0_IntKi      !< Switch for the axial drag formulation {0: original formulation, 1: Away from member only} [-]
+    Character(1024) :: AxKCFile               !< KC-Cd function file name
   END TYPE Morison_AxialCoefType
 ! =======================
 ! =========  Morison_MemberInputType  =======
@@ -453,6 +454,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: NFillGroups = 0_IntKi      !<  [-]
     TYPE(Morison_FilledGroupType) , DIMENSION(:), ALLOCATABLE  :: FilledGroups      !<  [-]
     INTEGER(IntKi)  :: NMGDepths = 0_IntKi      !<  [-]
+    INTEGER(IntKi)  :: NKCCd = 0_IntKi      !<  [-]
     TYPE(Morison_MGDepthsType) , DIMENSION(:), ALLOCATABLE  :: MGDepths      !<  [-]
     REAL(ReKi)  :: MGTop = 0.0_ReKi      !<  [-]
     REAL(ReKi)  :: MGBottom = 0.0_ReKi      !<  [-]
@@ -539,6 +541,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: VRelNFiltConst      !<  [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: DragMod_End      !<  [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: DragLoFSc_End      !<  [-]
+    CHARACTER(1024) :: KCFile               !< KC-Cd function file name
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: F_WMG_End      !< Joint marine growth weight loads, constant for all t [N]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: DP_Const_End      !< Constant part of Joint dynamic pressure term [N]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Mass_MG_End      !< Joint marine growth mass [kg]
