@@ -3043,7 +3043,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
          p%DragLoFSc_End (i) = InitInp%Nodes(i)%JAxFDLoFSc
       END IF
 
-      p%AxiKC(i) = InitInp%Nodes(i)%JAxiKC
+      p%DragAxiKC(i) = InitInp%Nodes(i)%JAxiKC
 
    END DO ! looping through nodes that are joints, i
           
@@ -3339,6 +3339,7 @@ SUBROUTINE AllocateNodeLoadVariables(InitInp, p, m, NNodes, errStat, errMsg )
    call AllocAry( m%V_rel_n_HiPass ,     p%NJoints, 'm%V_rel_n_HiPass', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%zFillGroup   ,   p%NFillGroups, 'm%zFillGroup'    , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragMod_End    ,     p%NJoints, 'p%DragMod_End'   , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
+   call AllocAry( p%DragAxiKC      ,     p%NJoints, 'p%DragAxiKC'     , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragLoFSc_End  ,     p%NJoints, 'p%DragLoFSc_End' , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%VRelNFiltConst ,     p%NJoints, 'p%VRelNFiltConst', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
 
@@ -4633,9 +4634,9 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
       vmagf = p%VRelNFiltConst(J) * (vmag + xd%v_rel_n_FiltStat(J))
 
       ! Drag coefficient if instantaneous KC dependent drag is enabled
-      IF ( p%AxiKC(J) > 0_IntKi ) THEN
+      IF ( p%DragAxiKC(J) > 0_IntKi ) THEN
          ILo = 1_IntKi
-         Cd_End_KC = InterpBin( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),1), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),2), Ilo, (p%iKCstart(p%AxiKC(J),2)-p%iKCstart(p%AxiKC(J),1)+1) )
+         Cd_End_KC = InterpBin( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),1), p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),2), Ilo, (p%iKCstart(p%DragAxiKC(J),2)-p%iKCstart(p%DragAxiKC(J),1)+1) )
       END IF
 
       ! Record most up-to-date vmagf and vmag at join J
@@ -4647,7 +4648,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
          IF (I < 4 ) THEN ! Three force components
             IF ( p%DragMod_End(J) .EQ. 0_IntKi ) THEN
                ! Note: vmag is zero if node is not in the water
-               IF ( p%AxiKC(J) > 0_IntKi ) THEN
+               IF ( p%DragAxiKC(J) > 0_IntKi ) THEN
                   m%F_D_End(i,j) = 0.25_ReKi * p%WaveField%WtrDens * Cd_End_KC * An_End(i) * abs(vmag)*vmag / dot_product(An_End,An_End)
                ELSE
                   m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*vmagf &   
@@ -4655,7 +4656,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
                END IF
             ELSE IF (p%DragMod_End(J) .EQ. 1_IntKi) THEN
                ! Note: vmag is zero if node is not in the water
-               IF ( p%AxiKC(J) > 0_IntKi ) THEN
+               IF ( p%DragAxiKC(J) > 0_IntKi ) THEN
                   m%F_D_End(i,j) = 0.5_ReKi * p%WaveField%WtrDens * Cd_End_KC * An_End(i) * abs(vmag)*vmag / dot_product(An_End,An_End) 
                ELSE
                   m%F_D_End(i,j) = (1.0_ReKi - p%DragLoFSc_End(j)) * An_End(i) * p%DragConst_End(j) * abs(vmagf)*max(vmagf,0.0_ReKi) &
@@ -6075,7 +6076,7 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
       xd%V_rel_n_FiltStat(J) = vmagf-vmag
 
       ! Update amplitude for instantaneous KC number
-      IF ( p%AxiKC(J) > 0 ) THEN 
+      IF ( p%DragAxiKC(J) > 0 ) THEN 
          IF (m%nodeInWater(j) == 0) THEN
             xd%AKC(J) = 0
          ELSE

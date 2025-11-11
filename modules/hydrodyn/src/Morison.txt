@@ -476,7 +476,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi                     DragConst_End                 {:}        -        -         ""        -
 typedef   ^                            ^                             ReKi                     VRelNFiltConst                {:}        -        -         ""        -
 typedef   ^                            ^                             IntKi                    DragMod_End                   {:}        -        -         ""        -
-typedef   ^                            ^                             IntKi                    AxiKC                         {:}        -        -         ""
+typedef   ^                            ^                             IntKi                    DragAxiKC                     {:}        -        -         ""
 typedef   ^                            ^                             ReKi                     DragLoFSc_End                 {:}        -        -         ""        -
 typedef   ^                            ^                             ReKi                     F_WMG_End                     {:}{:}     -        -         "Joint marine growth weight loads, constant for all t"   N
 typedef   ^                            ^                             ReKi                     DP_Const_End                  {:}{:}     -        -         "Constant part of Joint dynamic pressure term"   N
