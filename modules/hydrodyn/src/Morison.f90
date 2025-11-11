@@ -3337,7 +3337,6 @@ SUBROUTINE AllocateNodeLoadVariables(InitInp, p, m, NNodes, errStat, errMsg )
    call AllocAry( p%DP_Const_End ,    3, p%NJoints, 'p%DP_Const_End'  , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%V_rel_n        ,     p%NJoints, 'm%V_rel_n'       , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%V_rel_n_HiPass ,     p%NJoints, 'm%V_rel_n_HiPass', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
-   call AllocAry( m%AKC            ,     p%NJoints, 'm%AKC'           , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( m%zFillGroup   ,   p%NFillGroups, 'm%zFillGroup'    , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragMod_End    ,     p%NJoints, 'p%DragMod_End'   , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    call AllocAry( p%DragLoFSc_End  ,     p%NJoints, 'p%DragLoFSc_End' , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
@@ -3367,7 +3366,6 @@ SUBROUTINE AllocateNodeLoadVariables(InitInp, p, m, NNodes, errStat, errMsg )
    p%AM_End         = 0.0
    m%V_rel_n        = 0.0_ReKi
    m%V_rel_n_HiPass = 0.0_ReKi
-   m%AKC            = 0.0_ReKi
    
 END SUBROUTINE AllocateNodeLoadVariables
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -3434,6 +3432,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
    REAL(ReKi)               :: F_WMG(6), F_IMG(6), F_If(6), F_B0(6), F_B1(6), F_B2(6), F_B_End(6)
    REAL(ReKi)               :: AM_End(3,3), An_End(3), DP_Const_End(3), I_MG_End(3,3)
    REAL(ReKi)               :: Cd_End_KC
+   INTEGER(IntKi)           :: ILo  ! Dummy starting index needed for interpbin
 
    ! Local variables needed for wave stretching and load smoothing/redistribution
    INTEGER(IntKi)           :: FSElem
@@ -4635,7 +4634,8 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
 
       ! Drag coefficient if instantaneous KC dependent drag is enabled
       IF ( p%AxiKC(J) > 0_IntKi ) THEN
-         Cd_End_KC = InterpBinComp( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),1), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),2), 1, (p%iKCstart(p%AxiKC(J),2)-p%iKCstart(p%AxiKC(J),1)+1) )
+         ILo = 1_IntKi
+         Cd_End_KC = InterpBin( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),1), p%KCCd(p%iKCstart(p%AxiKC(J),1):p%iKCstart(p%AxiKC(J),2),2), Ilo, (p%iKCstart(p%AxiKC(J),2)-p%iKCstart(p%AxiKC(J),1)+1) )
       END IF
 
       ! Record most up-to-date vmagf and vmag at join J

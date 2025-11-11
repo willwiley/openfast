@@ -80,7 +80,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi             AxCp                     -          -        -         "Axial Cp"    -
 typedef   ^                            ^                             ReKi             AxVnCOff                 -          -        -         "High-pass cut-off frequency for normal velocity when computing axial drag force" -
 typedef   ^                            ^                             ReKi             AxFDLoFSc                -          -        -         "Scaling factor for low frequency axial drag force" -
-typedef   ^                            ^                             IntKi            AxFDMod                  -          -        -         "Switch for the axial drag formulation {0: original formulation, 1: Away from member only}" -
+typedef   ^                            ^                             IntKi            AxFDMod                  -          -        -         "Switch for the axial drag formulation {0: original formulation, 1: Away from member only}"
 typedef   ^                            ^                             INTEGER          AxiKC                    -          -        -         "Integer of KC-Cd file to use if instantaneous KC dependent drag is enabled (0 if constant drag coefficient is used)"
 #
 typedef   ^                            Morison_MemberInputType       INTEGER          MemberID                 -          -        -         "User-supplied integer ID for this member"    -
@@ -476,6 +476,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi                     DragConst_End                 {:}        -        -         ""        -
 typedef   ^                            ^                             ReKi                     VRelNFiltConst                {:}        -        -         ""        -
 typedef   ^                            ^                             IntKi                    DragMod_End                   {:}        -        -         ""        -
+typedef   ^                            ^                             IntKi                    AxiKC                         {:}        -        -         ""
 typedef   ^                            ^                             ReKi                     DragLoFSc_End                 {:}        -        -         ""        -
 typedef   ^                            ^                             ReKi                     F_WMG_End                     {:}{:}     -        -         "Joint marine growth weight loads, constant for all t"   N
 typedef   ^                            ^                             ReKi                     DP_Const_End                  {:}{:}     -        -         "Constant part of Joint dynamic pressure term"   N
@@ -492,6 +493,8 @@ typedef   ^                            ^                             logical    
 typedef   ^                            ^                             INTEGER                  PtfmYMod                      -          -        -         "Large yaw model" -
 typedef   ^                            ^                             INTEGER                  NFillGroups                   -          -        -         ""        -
 typedef   ^                            ^                             Morison_FilledGroupType  FilledGroups                  {:}        -        -         ""        -
+typedef   ^                            ^                             ReKi                     KCCd                          {:}{:}     -        -         ""
+typedef   ^                            ^                             INTEGER                  iKCstart                      {:}{:}     -        -         ""
 #
 #
 # ..... Inputs ....................................................................................................................
