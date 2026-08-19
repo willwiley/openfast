@@ -81,7 +81,8 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
    INTEGER                                      :: UnEc                 ! The local unit number for this module's echo file
    CHARACTER(1024)                              :: EchoFile             ! Name of HydroDyn echo file
    CHARACTER(MaxFileInfoLineLen)                :: Line                 ! String to temporarially hold value of read line
-   CHARACTER(8)                                 :: KCFile               ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(8)                                 :: KCFile1              ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(8)                                 :: KCFile2              ! String to temporarilly hold value of KC-Cd function name and number
    CHARACTER(1024)                              :: KCPath               ! String to temporarilly hold path name of KC-Cd function file
    TYPE(FileInfoType)                           :: FileInfo_KC          ! Temporary derived type to hold KC file information                               
    real(ReKi), ALLOCATABLE                      :: tmpVec1(:), tmpVec2(:) ! Temporary arrays for WAMIT data
@@ -394,30 +395,30 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
 
          ! Can't use ParseAry since cd could contain string for KC-Cd function
          Line = FileInfo_In%Lines(CurLine)
-         READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+         READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile1,    &
                                     InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp,  &
                                     InputFileData%Morison%AxialCoefs(I)%AxFDMod, InputFileData%Morison%AxialCoefs(I)%AxVnCOff,     &
                                     InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc
          if (IS_IOSTAT_EOR(ErrStat2)) then
             InputFileData%Morison%AxialCoefs(I)%AxVnCOff = -1.0
             InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc = 1.0
-            READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+            READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile1,    &
                                        InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp,  &
                                        InputFileData%Morison%AxialCoefs(I)%AxFDMod
             if (IS_IOSTAT_EOR(ErrStat2)) then
                InputFileData%Morison%AxialCoefs(I)%AxFDMod  = 0.0
                InputFileData%Morison%AxialCoefs(I)%AxVnCOff = -1.0
                InputFileData%Morison%AxialCoefs(I)%AxFDLoFSc = 1.0
-               READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile,    &
+               READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCoefID,    KCFile1,    &
                               InputFileData%Morison%AxialCoefs(I)%AxCa,   InputFileData%Morison%AxialCoefs(I)%AxCp
                if (Failed())  return;
             end if
          end if
-         if ( KCFile(1:2) == "KC" ) then
+         if ( KCFile1(1:2) == "KC" ) then
             InputFileData%Morison%AxialCoefs(I)%AxCd = 0.0
-            READ( KCFile(3:), '(I10)', iostat=ErrStat2 ) InputFileData%Morison%AxialCoefs(I)%AxiKC 
+            READ( KCFile1(3:), '(I10)', iostat=ErrStat2 ) InputFileData%Morison%AxialCoefs(I)%AxiKC 
          else
-            READ(KCFile,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCd
+            READ(KCFile1,*,IOSTAT=ErrStat2) InputFileData%Morison%AxialCoefs(I)%AxCd
             InputFileData%Morison%AxialCoefs(I)%AxiKC = 0
             if (ErrStat2 /= 0) then 
                ErrMsg2 = "AxCd input needs to either be a real number or a string starting with 'KC' followed by an integer between 1 and NKCCd"
@@ -794,40 +795,48 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
       END IF
 
       DO I = 1,InputFileData%Morison%NCoefMembersCyl
-            
-         CALL ParseRAryWKywrd( FileInfo_In, CurLine, 'Member-based cylindrical member  hydrodynamic coefficients table row '//trim( Int2LStr(I)), tmpReArray, size(tmpReArray), &
-                      'MCF', 1.0_ReKi, (/10,11,12,13/), InputFileData%Morison%CoefMembersCyl(I)%MemberMCF, ErrStat2, ErrMsg2, UnEc )
-            if (Failed())  return
 
-         InputFileData%Morison%CoefMembersCyl(I)%MemberID         = NINT(tmpReArray( 1))
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCd1        =      tmpReArray( 2)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCd2        =      tmpReArray( 3)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG1      =      tmpReArray( 4)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG2      =      tmpReArray( 5)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCa1        =      tmpReArray( 6)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCa2        =      tmpReArray( 7)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG1      =      tmpReArray( 8)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG2      =      tmpReArray( 9)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCp1        =      tmpReArray(10)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCp2        =      tmpReArray(11)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG1      =      tmpReArray(12)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG2      =      tmpReArray(13)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd1      =      tmpReArray(14)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd2      =      tmpReArray(15)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG1    =      tmpReArray(16)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG2    =      tmpReArray(17)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa1      =      tmpReArray(18)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa2      =      tmpReArray(19)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCaMG1    =      tmpReArray(20)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCaMG2    =      tmpReArray(21)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCp1      =      tmpReArray(22)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCp2      =      tmpReArray(23)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCpMG1    =      tmpReArray(24)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberAxCpMG2    =      tmpReArray(25)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCb1        =      tmpReArray(26)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCb2        =      tmpReArray(27)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCbMG1      =      tmpReArray(28)
-         InputFileData%Morison%CoefMembersCyl(I)%MemberCbMG2      =      tmpReArray(29)
+         Line = FileInfo_In%Lines(CurLine)
+         READ(Line,*,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberID,  &
+                                    KCFile1, KCFile2,  &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCa1, InputFileData%Morison%CoefMembersCyl(I)%MemberCa2,  &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCp1, InputFileData%Morison%CoefMembersCyl(I)%MemberCp2,  &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd1,  InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG1,   InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG2,   &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa1,  InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCaMG1,   InputFileData%Morison%CoefMembersCyl(I)%MemberAxCaMG2,   &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCp1,  InputFileData%Morison%CoefMembersCyl(I)%MemberAxCp2, &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberAxCpMG1,   InputFileData%Morison%CoefMembersCyl(I)%MemberAxCpMG2,   &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCb1, InputFileData%Morison%CoefMembersCyl(I)%MemberCb2,  &
+                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCbMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCbMG2
+
+         if ( KCFile1(1:2) == "KC" ) then
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCd1 = 0.0
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCd2 = 0.0
+            if ( trim(KCFile1) /= trim(KCFile2) ) then
+               ErrStat2 = ErrID_Fatal
+               ErrMsg2 = "MemberCd1 and MemberCd2 must be the same KC file reference when using KC-based input (e.g., KC1 and KC1)."
+               if (Failed())  return
+            end if
+            READ( KCFile1(3:), '(I10)', iostat=ErrStat2 ) InputFileData%Morison%CoefMembersCyl(I)%MemberiKC 
+         else
+            READ(KCFile1,*,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCd1
+            if (ErrStat2 /= 0) then 
+               ErrMsg2 = "MemberCd1 input needs to either be a real number or a string starting with 'KC' followed by an integer between 1 and NKCCd"
+            end if
+            READ(KCFile2,*,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCd2
+            if (ErrStat2 /= 0) then 
+               ErrMsg2 = "MemberCd2 input needs to either be a real number or the same string as MemberCd1, starting with 'KC' followed by an integer between 1 and NKCCd"
+            end if
+            InputFileData%Morison%CoefMembersCyl(I)%MemberiKC = 0
+            if (Failed())  return
+         end if
+
+         CurLine = CurLine + 1
+
       END DO
 
       if (allocated(tmpReArray))      deallocate(tmpReArray)

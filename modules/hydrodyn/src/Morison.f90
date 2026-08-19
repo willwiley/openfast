@@ -1501,6 +1501,7 @@ SUBROUTINE SetExternalHydroCoefs_Cyl(  MSL2SWL, MCoefMod, MmbrCoefIDIndx, SimplC
             member%AxCd  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCaMG1*(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCdMG2*s
             member%AxCa  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCaMG1*(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCaMG2*s
             member%AxCp  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCpMG1*(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCpMG2*s
+            member%iKC   (i) = CoefMembers(MmbrCoefIDIndx)%MemberiKC 
          else
             member%Cd    (i) = CoefMembers(MmbrCoefIDIndx)%MemberCd1    *(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberCd2    *s
             member%Ca    (i) = CoefMembers(MmbrCoefIDIndx)%MemberCa1    *(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberCa2    *s
@@ -1509,6 +1510,7 @@ SUBROUTINE SetExternalHydroCoefs_Cyl(  MSL2SWL, MCoefMod, MmbrCoefIDIndx, SimplC
             member%AxCd  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCd1  *(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCd2  *s
             member%AxCa  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCa1  *(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCa2  *s
             member%AxCp  (i) = CoefMembers(MmbrCoefIDIndx)%MemberAxCp1  *(1-s) + CoefMembers(MmbrCoefIDIndx)%MemberAxCp2  *s
+            member%iKC   (i) = CoefMembers(MmbrCoefIDIndx)%MemberiKC 
          end if
       end do
       member%propMCF = CoefMembers(MmbrCoefIDIndx)%MemberMCF
@@ -1735,6 +1737,7 @@ subroutine AllocateMemberDataArrays( member, memberLoads, errStat, errMsg )
       call AllocAry(member%Rin          , member%NElements+1, 'member%Rin          ', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
       call AllocAry(member%Cd           , member%NElements+1, 'member%Cd           ', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
       call AllocAry(member%Ca           , member%NElements+1, 'member%Ca           ', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
+      call AllocAry(member%iKC          , member%NElements+1, 'member%iKC          ', errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
    else if (member%MSecGeom == MSecGeom_Rec) then
       call AllocAry(member%dSadl_mg     , member%NElements,   'member%dSadl_mg'     , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
       call AllocAry(member%dSadl_mg_b   , member%NElements,   'member%dSadl_mg_b'   , errStat2, errMsg2); call SetErrStat(errStat2, errMsg2, errStat, errMsg, routineName)
@@ -1815,6 +1818,7 @@ subroutine AllocateMemberDataArrays( member, memberLoads, errStat, errMsg )
       member%Rin           = 0.0_ReKi
       member%Cd            = 0.0_ReKi
       member%Ca            = 0.0_ReKi
+      member%iKC           = 0_IntKi
    else if (member%MSecGeom == MSecGeom_Rec) then
       member%dSadl_mg      = 0.0_ReKi
       member%dSadl_mg_b    = 0.0_ReKi
@@ -2875,7 +2879,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
    END IF
    xd%V_rel_n_FiltStat = 0.0_ReKi
 
-   ALLOCATE ( xd%AKC(p%NJoints), STAT = ErrStat )
+   ALLOCATE ( xd%AKC(p%NNodes), STAT = ErrStat )
    IF ( ErrStat /= ErrID_None ) THEN
       ErrMsg  = ' Error allocating space for AKC array.'
       ErrStat = ErrID_Fatal
@@ -2883,13 +2887,21 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
    END IF
    xd%AKC = 0.0_ReKi
    
-   ALLOCATE ( xd%vmag_previous(p%NJoints), STAT = ErrStat )
+   ALLOCATE ( xd%vrel_rad_prev(3,p%NNodes), STAT = ErrStat )
    IF ( ErrStat /= ErrID_None ) THEN
-      ErrMsg  = ' Error allocating space for vmag_previous array.'
+      ErrMsg  = ' Error allocating space for vrel_rad_prev array.'
       ErrStat = ErrID_Fatal
       RETURN
    END IF
-   xd%vmag_previous = 0.0_ReKi
+   xd%vrel_rad_prev = 0.0_ReKi
+
+   ALLOCATE ( xd%vrel_ax_prev(3,p%NNodes), STAT = ErrStat )
+   IF ( ErrStat /= ErrID_None ) THEN
+      ErrMsg  = ' Error allocating space for vrel_ax_prev array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF
+   xd%vrel_ax_prev = 0.0_ReKi
 
    z%DummyConstrState         = 0
    OtherState%DummyOtherState = 0
@@ -3433,6 +3445,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
    REAL(ReKi)               :: F_WMG(6), F_IMG(6), F_If(6), F_B0(6), F_B1(6), F_B2(6), F_B_End(6)
    REAL(ReKi)               :: AM_End(3,3), An_End(3), DP_Const_End(3), I_MG_End(3,3)
    REAL(ReKi)               :: Cd_End_KC
+   REAL(ReKi)               :: Cd_KC
    INTEGER(IntKi)           :: ILo  ! Dummy starting index needed for interpbin
 
    ! Local variables needed for wave stretching and load smoothing/redistribution
@@ -3963,9 +3976,22 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
            !-------------------- hydrodynamic drag loads: sides: Section 7.1.2 ------------------------!
            vec = matmul( mem%Ak,m%vrel(:,mem%NodeIndx(i)) )
            IF (mem%MSecGeom==MSecGeom_Cyl) THEN
-              f_hydro = mem%Cd(i)*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                              ! radial part
+               IF ( mem%iKC(i) > 0_IntKi ) THEN
+                  ILo = 1_IntKi
+                  Cd_KC = InterpBin( xd%AKC(mem%NodeIndx(i))*2*Pi/(mem%RMG(i)*2), &
+                  p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),1), &
+                  p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),2), Ilo, &
+                  (p%iKCstart(mem%iKC(i),2)-p%iKCstart(mem%iKC(i),1)+1) )
+               END IF
+               IF ( mem%iKC(i) > 0_IntKi ) THEN
+                  f_hydro = Cd_KC*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                                    ! radial part
                         0.5*mem%AxCd(i)*p%WaveField%WtrDens * pi*mem%RMG(i)*dRdl_p * &                                               ! axial part
                         abs(dot_product( mem%k, m%vrel(:,mem%NodeIndx(i)) )) * matmul( mem%kkt, m%vrel(:,mem%NodeIndx(i)) )          ! axial part cont'd
+               ELSE
+                  f_hydro = mem%Cd(i)*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                                ! radial part
+                              0.5*mem%AxCd(i)*p%WaveField%WtrDens * pi*mem%RMG(i)*dRdl_p * &                                               ! axial part
+                              abs(dot_product( mem%k, m%vrel(:,mem%NodeIndx(i)) )) * matmul( mem%kkt, m%vrel(:,mem%NodeIndx(i)) )          ! axial part cont'd
+               END IF
            ELSE IF (mem%MSecGeom==MSecGeom_Rec) THEN
               f_hydro = 0.5*mem%CdB(i)*p%WaveField%WtrDens*mem%SbMG(i)*TwoNorm(vec)*Dot_Product(vec,mem%x_hat)*mem%x_hat  +  &       ! local x-direction
                         0.5*mem%CdA(i)*p%WaveField%WtrDens*mem%SaMG(i)*TwoNorm(vec)*Dot_Product(vec,mem%y_hat)*mem%y_hat  +  &       ! local z-direction
@@ -4323,9 +4349,20 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
            !--------------------- hydrodynamic drag loads: sides: Section 7.1.2 --------------------------------! 
            vec = matmul( mem%Ak,m%vrel(:,mem%NodeIndx(i)) )
            IF (mem%MSecGeom==MSecGeom_Cyl) THEN
-              f_hydro = mem%Cd(i)*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                              ! radial part
-                        0.5*mem%AxCd(i)*p%WaveField%WtrDens*pi*mem%RMG(i)*dRdl_p * &                                                 ! axial part
+               IF ( mem%iKC(i) > 0_IntKi ) THEN
+                  ILo = 1_IntKi
+                  Cd_KC = InterpBin( xd%AKC(mem%NodeIndx(i))*2*Pi/(mem%RMG(i)*2), &
+                  p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),1), &
+                  p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),2), Ilo, &
+                  (p%iKCstart(mem%iKC(i),2)-p%iKCstart(mem%iKC(i),1)+1) )
+                  f_hydro = Cd_KC*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                                    ! radial part
+                        0.5*mem%AxCd(i)*p%WaveField%WtrDens * pi*mem%RMG(i)*dRdl_p * &                                               ! axial part
                         abs(dot_product( mem%k, m%vrel(:,mem%NodeIndx(i)) )) * matmul( mem%kkt, m%vrel(:,mem%NodeIndx(i)) )          ! axial part cont'd
+               ELSE
+                  f_hydro = mem%Cd(i)*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                                ! radial part
+                              0.5*mem%AxCd(i)*p%WaveField%WtrDens * pi*mem%RMG(i)*dRdl_p * &                                               ! axial part
+                              abs(dot_product( mem%k, m%vrel(:,mem%NodeIndx(i)) )) * matmul( mem%kkt, m%vrel(:,mem%NodeIndx(i)) )          ! axial part cont'd
+               END IF
            ELSE IF (mem%MSecGeom==MSecGeom_Rec) THEN
               f_hydro = 0.5*mem%CdB(i)*p%WaveField%WtrDens*mem%SbMG(i)*TwoNorm(vec)*Dot_Product(vec,mem%x_hat)*mem%x_hat  +  &       ! local x-direction
                         0.5*mem%CdA(i)*p%WaveField%WtrDens*mem%SaMG(i)*TwoNorm(vec)*Dot_Product(vec,mem%y_hat)*mem%y_hat  +  &       ! local z-direction
@@ -4634,9 +4671,13 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
       vmagf = p%VRelNFiltConst(J) * (vmag + xd%v_rel_n_FiltStat(J))
 
       ! Drag coefficient if instantaneous KC dependent drag is enabled
+      Cd_End_KC = 0.0_ReKi
       IF ( p%DragAxiKC(J) > 0_IntKi ) THEN
          ILo = 1_IntKi
-         Cd_End_KC = InterpBin( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),1), p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),2), Ilo, (p%iKCstart(p%DragAxiKC(J),2)-p%iKCstart(p%DragAxiKC(J),1)+1) )
+         Cd_End_KC = InterpBin( xd%AKC(J)*2*Pi/(sqrt(sqrt(dot_product(An_End,An_End))/Pi)), &
+         p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),1), &
+         p%KCCd(p%iKCstart(p%DragAxiKC(J),1):p%iKCstart(p%DragAxiKC(J),2),2), Ilo, &
+         (p%iKCstart(p%DragAxiKC(J),2)-p%iKCstart(p%DragAxiKC(J),1)+1) )
       END IF
 
       ! Record most up-to-date vmagf and vmag at join J
@@ -6028,9 +6069,11 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
    INTEGER(IntKi),                    INTENT(  OUT)  :: errStat     !< Error status of the operation
    CHARACTER(*),                      INTENT(  OUT)  :: errMsg      !< Error message if errStat /= ErrID_None
    INTEGER(IntKi)                                    :: J
+   INTEGER(IntKi)                                    :: im, i, N, nodeIndx
    INTEGER(IntKi)                                    :: nodeInWater
-   REAL(ReKi)                                        :: pos(3), vrel(3), FV(3), vmag, vmagf, An_End(3)
+   REAL(ReKi)                                        :: pos(3), vrel(3), FV(3), vmag, vmagf, An_End(3), vrel_rad(3)
    REAL(SiKi)                                        :: FVTmp(3)
+   TYPE(Morison_MemberType)                          :: mem
    INTEGER(IntKi)                                    :: errStat2
    CHARACTER(ErrMsgLen)                              :: errMsg2
    CHARACTER(*), PARAMETER                           :: RoutineName = 'Morison_UpdateDiscState'
@@ -6075,21 +6118,68 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
       ! Update relative normal velocity filter state for joint J 
       xd%V_rel_n_FiltStat(J) = vmagf-vmag
 
-      ! Update amplitude for instantaneous KC number
+      ! Update amplitude for instantaneous axial KC number
+      vrel_rad = (An_End/TwoNorm(An_End)) * vrel
+
       IF ( p%DragAxiKC(J) > 0 ) THEN 
          IF (m%nodeInWater(j) == 0) THEN
             xd%AKC(J) = 0
          ELSE
-            IF (vmag * xd%vmag_previous(J) < 0) THEN
+            IF ( dot_product(vrel_rad, xd%vrel_ax_prev(:,J)) <= 0.0_ReKi ) THEN
                xd%AKC(J) = 0
             END IF
-            xd%AKC(J) = xd%AKC(J) + vmag*p%DT
+            xd%AKC(J) = xd%AKC(J) + TwoNorm(vrel_rad)*p%DT
          END IF
+         WRITE(*,*) "Joint ", J, " vmag = ", TwoNorm(vrel_rad), " vmag_previous = ", TwoNorm(xd%vrel_ax_prev(:,J)), " AKC = ", xd%AKC(J)
       END IF
 
-      xd%vmag_previous(J) = vmag
+      xd%vrel_ax_prev(:,J) = vrel_rad
 
    END DO ! J = 1, p%NJoints
+
+   ! Update state of the relative radial velocity at each member
+   DO im = 1, p%NMembers    
+      N   = p%Members(im)%NElements
+      mem = p%Members(im)
+      DO i = mem%i_floor+1,N+1
+         nodeIndx = mem%NodeIndx(i)
+
+         ! Get node position for wave kinematics at this member node.
+         IF (p%WaveDisp == 0 ) THEN
+            pos(1) = u%Mesh%Position(1,nodeIndx)
+            pos(2) = u%Mesh%Position(2,nodeIndx)
+         ELSE
+            pos(1) = u%Mesh%TranslationDisp(1,nodeIndx) + u%Mesh%Position(1,nodeIndx)
+            pos(2) = u%Mesh%TranslationDisp(2,nodeIndx) + u%Mesh%Position(2,nodeIndx)
+         END IF
+         IF (p%WaveField%WaveStMod > 0 .AND. p%WaveDisp /= 0) THEN
+            pos(3) = u%Mesh%Position(3,nodeIndx) + u%Mesh%TranslationDisp(3,nodeIndx) - p%WaveField%MSL2SWL
+         ELSE
+            pos(3) = u%Mesh%Position(3,nodeIndx) - p%WaveField%MSL2SWL
+         END IF
+
+         CALL WaveField_GetNodeWaveVel( p%WaveField, m%WaveField_m, Time, pos, .FALSE., nodeInWater, FVTmp, ErrStat2, ErrMsg2 )
+             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         FV   = REAL(FVTmp, ReKi)
+         vrel = ( FV - u%Mesh%TranslationVel(:,nodeIndx) ) * nodeInWater
+
+         ! Relative radial velocity for this member node (normal to the member axis).
+         vrel_rad = matmul(mem%Ak, vrel)
+
+         IF ( mem%iKC(i) > 0_IntKi ) THEN
+            IF (nodeInWater == 0_IntKi) THEN
+               xd%AKC(nodeIndx) = 0.0_ReKi
+            ELSE
+               IF ( dot_product(vrel_rad, xd%vrel_rad_prev(:,nodeIndx)) <= 0.0_ReKi ) THEN
+                  xd%AKC(nodeIndx) = 0.0_ReKi
+               END IF
+               xd%AKC(nodeIndx) = xd%AKC(nodeIndx) + TwoNorm(vrel_rad)*p%DT
+            END IF
+         END IF
+
+         xd%vrel_rad_prev(:,nodeIndx) = vrel_rad
+      END DO ! i = 1,N+1    ! loop through member nodes
+   END DO ! im    
 
 END SUBROUTINE Morison_UpdateDiscState
 !----------------------------------------------------------------------------------------------------------------------------------
