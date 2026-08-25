@@ -3003,13 +3003,6 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       RETURN
    END IF
    xd%vrel_ax_prev = 0.0_ReKi
-   ALLOCATE ( xd%MV_rel_n_FiltStat(4,p%NNodes), STAT = ErrStat )
-   IF ( ErrStat /= ErrID_None ) THEN
-      ErrMsg  = ' Error allocating space for MV_rel_n_FiltStat array.'
-      ErrStat = ErrID_Fatal
-      RETURN
-   END IF
-   xd%MV_rel_n_FiltStat = 0.0_ReKi
 
    ALLOCATE ( xd%MV_rel_n_FiltStat(4,p%NNodes), STAT = ErrStat )
    IF ( ErrStat /= ErrID_None ) THEN
