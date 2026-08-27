@@ -3003,7 +3003,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       RETURN
    END IF
    xd%vrel_ax_prev = 0.0_ReKi
-
+   
    ALLOCATE ( xd%MV_rel_n_FiltStat(4,p%NNodes), STAT = ErrStat )
    IF ( ErrStat /= ErrID_None ) THEN
       ErrMsg  = ' Error allocating space for MV_rel_n_FiltStat array.'
@@ -6587,7 +6587,6 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
             END IF
             xd%AKC(J) = xd%AKC(J) + TwoNorm(vrel_rad)*p%DT
          END IF
-         WRITE(*,*) "Joint ", J, " vmag = ", TwoNorm(vrel_rad), " vmag_previous = ", TwoNorm(xd%vrel_ax_prev(:,J)), " AKC = ", xd%AKC(J)
       END IF
 
       xd%vrel_ax_prev(:,J) = vrel_rad

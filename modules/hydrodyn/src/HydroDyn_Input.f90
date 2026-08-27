@@ -1171,16 +1171,23 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
                InputFileData%Morison%KCCd(InputFileData%Morison%iKCstart(I,1)+J-1,1) = tmpKCCd(1)
                InputFileData%Morison%KCCd(InputFileData%Morison%iKCstart(I,1)+J-1,2) = tmpKCCd(2)
                ! Add check that all KC are ascending with error message if not
-               ! IF ( J > 1 ) THEN 
-               !     IF ( tmpKCCd(1) <= InputFileData%Morison%KCCD(InputFileData%Morison%iKCstart(I,1)+J-2,1) ) THEN
-               !        Error Message
-               !     END IF
-               ! END IF
+               IF ( J > 1 ) THEN 
+                  IF ( tmpKCCd(1) <= InputFileData%Morison%KCCd(InputFileData%Morison%iKCstart(I,1)+J-2,1) ) THEN
+                     CALL SetErrStat( ErrID_Fatal, 'All KC values in a KC-Cd input file must be in ascending order.', ErrStat, ErrMsg, RoutineName )
+                     CALL Cleanup()
+                     RETURN
+                  END IF
+               END IF
             END DO ! J
          END DO
 
       ELSE 
+
+         ! If no KC-Cd function paths are provided, allocate empty arrays and reset CurLine
          CurLine = CurLine - 1
+         ALLOCATE(InputFileData%Morison%iKCstart(0,2))
+         ALLOCATE(InputFileData%Morison%KCCd(0,2))
+
       END IF
 
    !-------------------------------------------------------------------------------------------------
