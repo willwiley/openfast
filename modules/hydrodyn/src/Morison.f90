@@ -153,6 +153,7 @@ SUBROUTINE Morison_DirCosMtrx_noSpin( pos0, pos1, DirCos )
 
 END SUBROUTINE Morison_DirCosMtrx_noSpin
 
+
 SUBROUTINE GetDisplacedNodePosition( u, p, forceDisplaced, pos )
    TYPE(Morison_InputType),     INTENT(IN   ) :: u              !< Inputs at Time
    TYPE(Morison_ParameterType), INTENT(IN   ) :: p              !< Parameters
@@ -1566,7 +1567,6 @@ SUBROUTINE SetExternalHydroCoefs_Cyl(  MSL2SWL, MCoefMod, MmbrCoefIDIndx, SimplC
        do i = 1, member%NElements + 1
          ! Pull member  end-node data from the tables and then linearly interpolate it onto the interior member nodes    
          s = (real(i,ReKi)-1.0) / real(member%NElements,ReKi)
-         if (member%flipped) s = 1.0-s
          if (member%flipped) s = 1.0-s
          if ( member%tMG(i) > 0.0_ReKi ) then
             member%Cd    (i) = CoefMembers(MmbrCoefIDIndx)%MemberCdMG1  *(1.0-s) + CoefMembers(MmbrCoefIDIndx)%MemberCdMG2  *s
@@ -4119,8 +4119,6 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
                   p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),1), &
                   p%KCCd(p%iKCstart(mem%iKC(i),1):p%iKCstart(mem%iKC(i),2),2), Ilo, &
                   (p%iKCstart(mem%iKC(i),2)-p%iKCstart(mem%iKC(i),1)+1) )
-               END IF
-               IF ( mem%iKC(i) > 0_IntKi ) THEN
                   f_hydro = Cd_KC*p%WaveField%WtrDens*mem%RMG(i)*TwoNorm(vec)*vec  +  &                                                    ! radial part
                         0.5*mem%AxCd(i)*p%WaveField%WtrDens * pi*mem%RMG(i)*dRdl_p * &                                               ! axial part
                         abs(dot_product( mem%k, m%vrel(:,mem%NodeIndx(i)) )) * matmul( mem%kkt, m%vrel(:,mem%NodeIndx(i)) )          ! axial part cont'd
@@ -4864,14 +4862,9 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
             y%Mesh%Force(i,j) = y%Mesh%Force(i,j) + m%F_tot_End(i,j)
          ELSE ! Three moment components
             m%F_tot_End(i,j)  = m%F_B_End(i,j) + m%F_BF_End(i,j)  + m%F_IMG_End(i,j)
-            y%Mesh%Moment(i-3,j) = y%Mesh%Moment(i-3,j) + m%F_tot_End(i,j)
-            m%F_tot_End(i,j)  = m%F_B_End(i,j) + m%F_BF_End(i,j)  + m%F_IMG_End(i,j)
-            y%Mesh%Moment(i-3,j) = y%Mesh%Moment(i-3,j) + m%F_tot_End(i,j)
+            y%Mesh%Moment(i-3,j) = y%Mesh%Moment(i-3,j) + m%F_tot_End(i,j) 
          END IF
       END DO  ! I=1,6
-      ! Compute and save the joint total moment about PRP for output file
-      m%F_tot_End(4:6,j) = m%F_tot_End(4:6,j) + cross_product( u%Mesh%Position(:,j)+u%Mesh%TranslationDisp(:,j)-u%PRP, m%F_tot_End(1:3,j))
-
       ! Compute and save the joint total moment about PRP for output file
       m%F_tot_End(4:6,j) = m%F_tot_End(4:6,j) + cross_product( u%Mesh%Position(:,j)+u%Mesh%TranslationDisp(:,j)-u%PRP, m%F_tot_End(1:3,j))
 

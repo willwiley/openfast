@@ -81,8 +81,9 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
    INTEGER                                      :: UnEc                 ! The local unit number for this module's echo file
    CHARACTER(1024)                              :: EchoFile             ! Name of HydroDyn echo file
    CHARACTER(MaxFileInfoLineLen)                :: Line                 ! String to temporarially hold value of read line
-   CHARACTER(8)                                 :: KCFile1              ! String to temporarilly hold value of KC-Cd function name and number
-   CHARACTER(8)                                 :: KCFile2              ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(16)                                :: KCFile1              ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(16)                                :: KCFile2              ! String to temporarilly hold value of KC-Cd function name and number
+   CHARACTER(8)                                 :: CpMCF1, CpMCF2, CpMCFMG1, CpMCFMG2  ! Strings to temporarilly hold MemberCp entries, which may be the 'MCF' keyword
    CHARACTER(1024)                              :: KCPath               ! String to temporarilly hold path name of KC-Cd function file
    TYPE(FileInfoType)                           :: FileInfo_KC          ! Temporary derived type to hold KC file information                               
    INTEGER                                      :: NDOF                 ! Number of DOF in each WAMIT module
@@ -96,7 +97,6 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
    INTEGER(IntKi)                               :: NKC                  ! Temporary number of lines in a KC-Cd function file
    INTEGER(IntKi)                               :: totalNKC             ! Temporary counter for the total number of lines in concatenated KC table
    REAL(ReKi), DIMENSION(2)                     :: tmpKCCd              ! Temporary array for reading row of KC-Cd function files
-   
    INTEGER(IntKi)                               :: ErrStat2
    CHARACTER(ErrMsgLen)                         :: ErrMsg2
    CHARACTER(*),  PARAMETER                     :: RoutineName = 'HydroDyn_ParaseInput'
@@ -821,8 +821,8 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCdMG2, &
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberCa1, InputFileData%Morison%CoefMembersCyl(I)%MemberCa2,  &
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCaMG2, &
-                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCp1, InputFileData%Morison%CoefMembersCyl(I)%MemberCp2,  &
-                                    InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG1,  InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG2, &
+                                    CpMCF1, CpMCF2,  &
+                                    CpMCFMG1,  CpMCFMG2, &
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd1,  InputFileData%Morison%CoefMembersCyl(I)%MemberAxCd2, &
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG1,   InputFileData%Morison%CoefMembersCyl(I)%MemberAxCdMG2,   &
                                     InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa1,  InputFileData%Morison%CoefMembersCyl(I)%MemberAxCa2, &
@@ -853,6 +853,42 @@ SUBROUTINE HydroDyn_ParseInput( InputFileName, OutRootName, FileInfo_In, InputFi
             InputFileData%Morison%CoefMembersCyl(I)%MemberiKC = 0
             if (Failed())  return
          end if
+
+         ! MCF keyword must appear in all four of MemberCp1, MemberCp2, MemberCpMG1, MemberCpMG2, or none of them
+         IF ( trim(CpMCF1) == 'MCF' .OR. trim(CpMCF2) == 'MCF' .OR. trim(CpMCFMG1) == 'MCF' .OR. trim(CpMCFMG2) == 'MCF' ) THEN
+            IF ( trim(CpMCF1) /= 'MCF' .OR. trim(CpMCF2) /= 'MCF' .OR. trim(CpMCFMG1) /= 'MCF' .OR. trim(CpMCFMG2) /= 'MCF' ) THEN
+               ErrStat2 = ErrID_Fatal
+               ErrMsg2 = "When parsing member-based cylindrical member hydrodynamic coefficients table, MCF is used at some but not all of MemberCp1, MemberCp2, MemberCpMG1, MemberCpMG2."
+               if (Failed())  return
+            END IF
+            InputFileData%Morison%CoefMembersCyl(I)%MemberMCF   = .true.
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCp1   = 1.0_ReKi
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCp2   = 1.0_ReKi
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG1 = 1.0_ReKi
+            InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG2 = 1.0_ReKi
+         ELSE
+            InputFileData%Morison%CoefMembersCyl(I)%MemberMCF = .false.
+            READ(CpMCF1,  *,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCp1
+            if (ErrStat2 /= 0) then
+               ErrMsg2 = "MemberCp1 input needs to either be a real number or 'MCF'"
+            end if
+            if (Failed())  return
+            READ(CpMCF2,  *,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCp2
+            if (ErrStat2 /= 0) then
+               ErrMsg2 = "MemberCp2 input needs to either be a real number or 'MCF'"
+            end if
+            if (Failed())  return
+            READ(CpMCFMG1,*,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG1
+            if (ErrStat2 /= 0) then
+               ErrMsg2 = "MemberCpMG1 input needs to either be a real number or 'MCF'"
+            end if
+            if (Failed())  return
+            READ(CpMCFMG2,*,IOSTAT=ErrStat2) InputFileData%Morison%CoefMembersCyl(I)%MemberCpMG2
+            if (ErrStat2 /= 0) then
+               ErrMsg2 = "MemberCpMG2 input needs to either be a real number or 'MCF'"
+            end if
+            if (Failed())  return
+         END IF
 
          CurLine = CurLine + 1
 
