@@ -6601,14 +6601,16 @@ SUBROUTINE Morison_UpdateDiscState( Time, u, p, x, xd, z, OtherState, m, errStat
          ! Relative radial velocity for this member node (normal to the member axis).
          vrel_rad = matmul(mem%Ak, vrel)
 
-         IF ( mem%iKC(i) > 0_IntKi ) THEN
-            IF (nodeInWater == 0_IntKi) THEN
-               xd%AKC(nodeIndx) = 0.0_ReKi
-            ELSE
-               IF ( dot_product(vrel_rad, xd%vrel_rad_prev(:,nodeIndx)) <= 0.0_ReKi ) THEN
+         IF ( mem%MSecGeom == MSecGeom_Cyl ) THEN
+            IF ( mem%iKC(i) > 0_IntKi ) THEN
+               IF (nodeInWater == 0_IntKi) THEN
                   xd%AKC(nodeIndx) = 0.0_ReKi
+               ELSE
+                  IF ( dot_product(vrel_rad, xd%vrel_rad_prev(:,nodeIndx)) <= 0.0_ReKi ) THEN
+                     xd%AKC(nodeIndx) = 0.0_ReKi
+                  END IF
+                  xd%AKC(nodeIndx) = xd%AKC(nodeIndx) + TwoNorm(vrel_rad)*p%DT
                END IF
-               xd%AKC(nodeIndx) = xd%AKC(nodeIndx) + TwoNorm(vrel_rad)*p%DT
             END IF
          END IF
 
